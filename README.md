@@ -5,7 +5,14 @@ servers. Pick a session from the sidebar, drop into a full interactive terminal 
 It looks and behaves like `lazygit` / `k9s` / `btop` (monospace, keyboard-first, zero chrome), not
 a SaaS dashboard.
 
-![Hearth](docs/screenshot.png)
+![Hearth overview](docs/overview.png)
+*Servers and their tmux sessions in a keyboard-first sidebar.*
+
+![Attached terminal](docs/terminal.png)
+*Attach and you're in a full interactive terminal, Nerd Font glyphs included.*
+
+![Running an agent in a session](docs/agent.png)
+*Sessions stay alive on the server, so long-running work survives reconnects.*
 
 ## How it works
 
