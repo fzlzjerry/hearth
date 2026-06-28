@@ -1,0 +1,37 @@
+# /etc/systemd/system/hearthd.service
+#
+#   sudo cp deploy/hearthd.service /etc/systemd/system/hearthd.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hearthd
+#   journalctl -u hearthd -f
+#
+# Adjust User, WorkingDirectory and the node path to your install.
+
+[Unit]
+Description=hearthd — Hearth terminal daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hearth
+Group=hearth
+WorkingDirectory=/opt/hearth/apps/hub
+# Load HEARTH_TOKEN / JWT_SECRET / etc. from here (chmod 600, owned by the service user).
+EnvironmentFile=/opt/hearth/apps/hub/.env
+# Use an absolute node path (e.g. an nvm/fnm install or /usr/bin/node). Node 20+ (22 LTS recommended).
+ExecStart=/usr/bin/node /opt/hearth/apps/hub/dist/index.js
+Restart=on-failure
+RestartSec=2
+# tmux needs a place to put its socket; give the service its own runtime dir.
+RuntimeDirectory=hearthd
+Environment=NODE_ENV=production
+
+# ── hardening ──
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

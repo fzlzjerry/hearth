@@ -1,0 +1,26 @@
+# Cloudflare Tunnel config for exposing hearthd as HTTPS + WSS at hearth.<your-domain>.
+#
+# Prereqs (run on the VPS):
+#   cloudflared tunnel login
+#   cloudflared tunnel create hearth          # prints a tunnel UUID + creds json
+#   cloudflared tunnel route dns hearth hearth.example.com
+#
+# Put this file at ~/.cloudflared/config.yml (or /etc/cloudflared/config.yml), then:
+#   cloudflared tunnel run hearth
+#   # or install as a service:  sudo cloudflared service install
+#
+# WebSockets are proxied automatically — no extra flag needed. The hub's own
+# WS_PING_MS (~30s) keeps idle terminals alive past Cloudflare's ~100s idle timeout.
+
+tunnel: hearth
+credentials-file: /root/.cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: hearth.example.com
+    service: http://127.0.0.1:8080
+    originRequest:
+      # be generous: terminal sessions are long-lived
+      connectTimeout: 30s
+      noTLSVerify: false
+  # everything else 404s
+  - service: http_status:404

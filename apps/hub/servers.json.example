@@ -1,0 +1,17 @@
+[
+  {
+    "id": "vps",
+    "name": "vps · frankfurt",
+    "host": "203.0.113.10",
+    "port": 22,
+    "user": "deploy",
+    "identityFile": "~/.ssh/id_ed25519"
+  },
+  {
+    "id": "lab",
+    "name": "lab · gpu-box",
+    "host": "10.0.0.42",
+    "user": "rin",
+    "identityFile": "~/.ssh/lab_ed25519"
+  }
+]
