@@ -30,16 +30,18 @@ export default function Tabs({ tabs, activeId, status, onActivate, onClose, onNe
             <span className={`group -mb-px flex items-center border-b-2 ${active ? 'border-accent' : 'border-transparent'}`}>
               <button
                 onClick={() => onActivate(tab.id)}
-                className={`flex items-center gap-1.5 px-1 ${active ? 'text-accent' : 'text-dim hover:text-text'}`}
+                className={`flex items-center gap-1.5 px-1.5 py-1 ${active ? 'text-accent' : 'text-dim hover:text-text'}`}
                 title={`${tab.serverName} · ${tab.session}`}
               >
                 <span className={`select-none text-[10px] ${DOT[status[tab.id] ?? 'connecting']}`}>●</span>
                 {tab.session}
               </button>
+              {/* always tappable on touch; only the hover-reveal is reserved for pointer devices (md+) */}
               <button
                 onClick={() => onClose(tab.id)}
-                className="mr-1 select-none text-dimmer opacity-0 hover:text-danger group-hover:opacity-100"
+                className="mr-1 select-none px-1 py-1 text-dimmer hover:text-danger md:px-0 md:opacity-0 md:group-hover:opacity-100"
                 title="close tab (⌘W)"
+                aria-label={`close ${tab.session}`}
               >
                 ✕
               </button>

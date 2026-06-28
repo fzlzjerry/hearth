@@ -24,10 +24,18 @@ const TERMINAL_HINTS: Hint[] = [
   { key: '⌘K', label: 'jump' },
 ]
 
-export default function StatusBar({ focus }: { focus: 'sidebar' | 'terminal' }) {
+export default function StatusBar({
+  focus,
+  className = '',
+}: {
+  focus: 'sidebar' | 'terminal'
+  className?: string
+}) {
   const hints = focus === 'terminal' ? TERMINAL_HINTS : SIDEBAR_HINTS
   return (
-    <footer className="flex h-[22px] shrink-0 items-center gap-4 overflow-hidden border-t border-border px-3 text-[11px]">
+    <footer
+      className={`h-[22px] shrink-0 items-center gap-4 overflow-hidden border-t border-border px-3 text-[11px] ${className}`}
+    >
       {hints.map((h) => (
         <span key={h.key} className="select-none whitespace-nowrap">
           <span className="text-accent">{h.key}</span> <span className="text-dim">{h.label}</span>

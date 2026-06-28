@@ -33,6 +33,14 @@ export interface OpenTab {
 
 export type ConnStatus = 'connecting' | 'connected' | 'disconnected'
 
+/** Imperative handle a terminal exposes so the touch key bar can drive it. */
+export interface TermInputApi {
+  /** Write a raw sequence to the terminal as if typed (routes through the WS). */
+  input: (data: string) => void
+  /** Refocus the terminal so the soft keyboard stays up. */
+  focus: () => void
+}
+
 /** A flattened, keyboard-navigable sidebar row. */
 export type NavRow =
   | { kind: 'server'; serverId: string }

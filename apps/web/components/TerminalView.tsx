@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Terminal as XTerm } from '@xterm/xterm'
 import type { FitAddon as XFitAddon } from '@xterm/addon-fit'
 import { AuthError, fetchWsToken } from '@/lib/api'
-import type { ConnStatus } from '@/lib/types'
+import type { ConnStatus, TermInputApi } from '@/lib/types'
 
 // Exact palette from the spec — xterm needs concrete hex (it can't read CSS vars).
 const THEME = {
@@ -46,9 +46,27 @@ interface Props {
   active: boolean
   onStatus?: (s: ConnStatus) => void
   onAuthError?: () => void
+  /** `${serverId}:${session}` — the key under which this terminal registers its input handle. */
+  tabId?: string
+  /** Publish/retract this terminal's imperative input handle so the touch key bar can reach it. */
+  registerInput?: (id: string, api: TermInputApi | null) => void
+  /** When true, the next typed key is rewritten as ctrl-<key> (the touch ctrl modifier). */
+  ctrlArmed?: boolean
+  /** Fired the moment the armed ctrl is spent (or cleared on blur), so the owner can disarm. */
+  onCtrlConsumed?: () => void
 }
 
-export default function TerminalView({ serverId, session, active, onStatus, onAuthError }: Props) {
+export default function TerminalView({
+  serverId,
+  session,
+  active,
+  onStatus,
+  onAuthError,
+  tabId,
+  registerInput,
+  ctrlArmed,
+  onCtrlConsumed,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<XFitAddon | null>(null)
@@ -57,7 +75,33 @@ export default function TerminalView({ serverId, session, active, onStatus, onAu
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const attemptRef = useRef(0)
   const encRef = useRef(new TextEncoder())
+  const ctrlArmedRef = useRef(false)
+  const blurCleanupRef = useRef<(() => void) | null>(null)
+  // hold the latest callbacks/ids in refs so the once-only onData handler never reads a stale closure
+  const onCtrlConsumedRef = useRef(onCtrlConsumed)
+  const registerInputRef = useRef(registerInput)
+  const tabIdRef = useRef(tabId)
   const [status, setStatus] = useState<ConnStatus>('connecting')
+
+  useEffect(() => {
+    ctrlArmedRef.current = !!ctrlArmed
+  }, [ctrlArmed])
+  useEffect(() => {
+    onCtrlConsumedRef.current = onCtrlConsumed
+    registerInputRef.current = registerInput
+    tabIdRef.current = tabId
+  })
+
+  // Spend the armed ctrl (if any) and rewrite a single ascii letter / @[\]^_ into its control code.
+  function applyCtrl(data: string): string {
+    if (!ctrlArmedRef.current) return data
+    ctrlArmedRef.current = false
+    onCtrlConsumedRef.current?.()
+    if (data.length !== 1) return data
+    const c = data.charCodeAt(0)
+    if ((c >= 0x40 && c <= 0x5f) || (c >= 0x61 && c <= 0x7a)) return String.fromCharCode(c & 0x1f)
+    return data
+  }
 
   function emitStatus(s: ConnStatus) {
     setStatus(s)
@@ -183,9 +227,29 @@ export default function TerminalView({ serverId, session, active, onStatus, onAu
 
       term.onData((data) => {
         const ws = wsRef.current
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send(encRef.current.encode(data))
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(encRef.current.encode(applyCtrl(data)))
       })
       term.onResize(({ cols, rows }) => sendResize(cols, rows))
+
+      // clear a stale ctrl arm if focus leaves before the next keystroke lands
+      const textarea = term.textarea
+      const onBlur = () => {
+        if (ctrlArmedRef.current) {
+          ctrlArmedRef.current = false
+          onCtrlConsumedRef.current?.()
+        }
+      }
+      textarea?.addEventListener('blur', onBlur)
+      blurCleanupRef.current = () => textarea?.removeEventListener('blur', onBlur)
+
+      // publish an imperative handle so the touch key bar can inject keys this terminal can't get otherwise
+      const id = tabIdRef.current
+      if (id) {
+        registerInputRef.current?.(id, {
+          input: (d) => termRef.current?.input(d),
+          focus: () => termRef.current?.focus(),
+        })
+      }
 
       ro = new ResizeObserver(() => safeFit())
       ro.observe(containerRef.current)
@@ -201,6 +265,9 @@ export default function TerminalView({ serverId, session, active, onStatus, onAu
       disposedRef.current = true
       if (reconnectRef.current) clearTimeout(reconnectRef.current)
       ro?.disconnect()
+      blurCleanupRef.current?.()
+      blurCleanupRef.current = null
+      if (tabIdRef.current) registerInputRef.current?.(tabIdRef.current, null)
       const ws = wsRef.current
       wsRef.current = null
       if (ws) {
@@ -229,8 +296,8 @@ export default function TerminalView({ serverId, session, active, onStatus, onAu
   }, [active])
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-bg">
-      <div ref={containerRef} className="h-full w-full px-2 pt-1.5" />
+    <div className="relative h-full w-full overflow-hidden overscroll-contain bg-bg">
+      <div ref={containerRef} className="h-full w-full overscroll-contain px-2 pt-1.5" />
       {status !== 'connected' ? (
         <div className="pointer-events-none absolute right-2 top-2 border border-border bg-bg px-2 py-0.5 text-[11px]">
           <span className={status === 'connecting' ? 'text-data' : 'text-danger'}>●</span>{' '}

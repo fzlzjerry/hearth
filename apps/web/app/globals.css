@@ -74,6 +74,20 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
+  /* stop pull-to-refresh / rubber-band bounce bleeding through the app shell */
+  overscroll-behavior: none;
+}
+
+/* On touch devices, iOS zooms in when focusing a control whose text is < 16px.
+   The terminal's hidden input is offscreen, so 16px there is invisible but kills the zoom;
+   bumping the form controls to 16px on coarse pointers also makes them easier to tap. */
+@media (pointer: coarse) {
+  .xterm-helper-textarea,
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 /* TUI scrollbars — thin, no chrome */

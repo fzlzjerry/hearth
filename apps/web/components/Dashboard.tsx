@@ -6,6 +6,7 @@ import TopBar from './TopBar'
 import Sidebar from './Sidebar'
 import Tabs from './Tabs'
 import StatusBar from './StatusBar'
+import MobileBar from './MobileBar'
 import TerminalView from './TerminalView'
 import CommandPalette, { type PaletteItem } from './CommandPalette'
 import Modal from './Modal'
@@ -19,7 +20,15 @@ import {
   removeServer as apiRemoveServer,
   logout as apiLogout,
 } from '@/lib/api'
-import type { ConnStatus, NavRow, OpenTab, ServerInput, ServerSummary, SessionInfo } from '@/lib/types'
+import type {
+  ConnStatus,
+  NavRow,
+  OpenTab,
+  ServerInput,
+  ServerSummary,
+  SessionInfo,
+  TermInputApi,
+} from '@/lib/types'
 
 const NAME_RE = /^[A-Za-z0-9_.-]{1,64}$/
 
@@ -56,8 +65,28 @@ export default function Dashboard() {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [modal, setModal] = useState<ModalState>(null)
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false)
+  // touch ctrl modifier: armed by the mobile key bar, consumed by the active terminal's next keystroke
+  const [ctrlArmed, setCtrlArmed] = useState(false)
 
   const sidebarWrapRef = useRef<HTMLDivElement>(null)
+  // imperative input handles published by each live terminal, keyed by tab id
+  const inputApisRef = useRef<Map<string, TermInputApi>>(new Map())
+
+  const registerInput = useCallback((id: string, api: TermInputApi | null) => {
+    if (api) inputApisRef.current.set(id, api)
+    else inputApisRef.current.delete(id)
+  }, [])
+
+  // mobile key bar → active terminal; the terminal clears the ctrl arm itself once spent
+  const sendKey = useCallback(
+    (seq: string) => {
+      if (!activeTabId) return
+      const api = inputApisRef.current.get(activeTabId)
+      api?.input(seq)
+      api?.focus()
+    },
+    [activeTabId],
+  )
 
   const serverById = useMemo(() => {
     const m = new Map<string, ServerSummary>()
@@ -399,11 +428,13 @@ export default function Dashboard() {
   const sidebarCls = [
     'flex flex-col shrink-0 border-r border-border bg-bg overflow-hidden outline-none',
     'md:static md:flex md:w-[210px]',
-    sidebarOpenMobile ? 'absolute left-0 top-[30px] bottom-[22px] z-40 w-[260px]' : 'hidden md:flex',
+    // the drawer is positioned inside the middle region (already below the top bar and above the
+    // bottom bar), so it fills that region with inset-y-0 — no hardcoded bar heights to drift out of sync
+    sidebarOpenMobile ? 'absolute inset-y-0 left-0 z-40 w-[min(80vw,260px)]' : 'hidden md:flex',
   ].join(' ')
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-bg text-text">
+    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-bg text-text">
       <TopBar
         status={activeStatus}
         hasActiveTab={!!activeTabId}
@@ -464,7 +495,11 @@ export default function Dashboard() {
                   <TerminalView
                     serverId={t.serverId}
                     session={t.session}
+                    tabId={t.id}
                     active={t.id === activeTabId}
+                    registerInput={registerInput}
+                    ctrlArmed={t.id === activeTabId && ctrlArmed}
+                    onCtrlConsumed={() => setCtrlArmed(false)}
                     onStatus={(s) => setStatusByTab((prev) => ({ ...prev, [t.id]: s }))}
                     onAuthError={goLogin}
                   />
@@ -475,7 +510,17 @@ export default function Dashboard() {
         </main>
       </div>
 
-      <StatusBar focus={focus} />
+      {/* desktop: keyboard-hint bar · mobile: thumb-operable action / terminal-key bar (CSS-gated, both rendered) */}
+      <StatusBar focus={focus} className="hidden md:flex" />
+      <MobileBar
+        className="flex md:hidden"
+        hasTerminal={!!activeTabId}
+        ctrlArmed={ctrlArmed}
+        onKey={sendKey}
+        onToggleCtrl={() => setCtrlArmed((v) => !v)}
+        onJump={() => setPaletteOpen(true)}
+        onNew={startNewSession}
+      />
 
       {paletteOpen ? (
         <CommandPalette
@@ -564,15 +609,22 @@ function EmptyState() {
           <span className="text-accent">›</span> <span className="font-bold text-accent">hearth</span>{' '}
           <span className="text-dimmer">tmux dashboard</span>
         </div>
-        <p className="mt-5 text-[12px] text-dim">
+        {/* desktop drives by keyboard; touch drives by the hamburger + the bottom action bar */}
+        <p className="mt-5 hidden text-[12px] text-dim md:block">
           select a session and press <span className="text-accent">⏎</span> to attach
         </p>
-        <p className="mt-2 text-[12px] text-dimmer">
+        <p className="mt-2 hidden text-[12px] text-dimmer md:block">
           <span className="text-accent">⌘K</span> jump
           <span className="mx-1.5 text-dimmer">·</span>
           <span className="text-accent">n</span> new
           <span className="mx-1.5 text-dimmer">·</span>
           <span className="text-accent">a</span> add server
+        </p>
+        <p className="mt-5 text-[12px] text-dim md:hidden">
+          tap <span className="text-accent">≡</span> to pick a session
+        </p>
+        <p className="mt-2 text-[12px] text-dimmer md:hidden">
+          or <span className="text-accent">jump</span> / <span className="text-accent">new</span> below
         </p>
       </div>
     </div>

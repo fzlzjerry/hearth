@@ -20,6 +20,8 @@ export const viewport: Viewport = {
   themeColor: '#0d0e0f',
   width: 'device-width',
   initialScale: 1,
+  // let the app paint into the notch / home-indicator area; bars opt back in via env(safe-area-inset-*)
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

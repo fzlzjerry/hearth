@@ -26,9 +26,9 @@ export default function TopBar({ status, hasActiveTab, onToggleSidebar, onLogout
         : 'disconnected'
 
   return (
-    <header className="flex h-[30px] shrink-0 items-center gap-2 border-b border-border px-3 text-[12px]">
+    <header className="flex h-[30px] shrink-0 items-center gap-2 border-b border-border pr-3 pl-1 text-[12px] sm:px-3">
       <button
-        className="mr-1 text-dim hover:text-text md:hidden"
+        className="-my-1 px-2 py-1 text-[15px] leading-none text-dim hover:text-text md:hidden"
         onClick={onToggleSidebar}
         aria-label="toggle sidebar"
       >
@@ -38,11 +38,13 @@ export default function TopBar({ status, hasActiveTab, onToggleSidebar, onLogout
         <span className="select-none text-accent">›</span>
         <span className="font-bold text-accent">hearth</span>
       </span>
-      <span className="text-dim">tmux dashboard</span>
+      {/* subtitle is decoration; reclaim the width on phones */}
+      <span className="hidden text-dim sm:inline">tmux dashboard</span>
       <div className="flex-1" />
       <span className={dot}>●</span>
-      <span className="text-dim">{label}</span>
-      <span className="mx-1 select-none text-border">│</span>
+      {/* the dot already carries the state on phones; the word is the desktop nicety */}
+      <span className="hidden text-dim sm:inline">{label}</span>
+      <span className="mx-1 hidden select-none text-border sm:inline">│</span>
       <button onClick={onLogout} className="text-dimmer hover:text-text" title="log out">
         logout
       </button>

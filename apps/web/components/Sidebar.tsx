@@ -41,7 +41,7 @@ export default function Sidebar({
       <div className="flex select-none items-center gap-2 px-2 py-1 text-[11px] text-dim">
         <span>servers</span>
         <span className="flex-1 overflow-hidden text-dimmer">{'─'.repeat(60)}</span>
-        <button onClick={onAddServer} className="shrink-0 text-accent hover:text-sel-text" title="add server (a)">
+        <button onClick={onAddServer} className="-my-1 shrink-0 px-1 py-1 text-accent hover:text-sel-text" title="add server (a)">
           + add
         </button>
       </div>
@@ -56,7 +56,7 @@ export default function Sidebar({
           navRows.map((row, i) => {
             const selected = i === selectedIndex
             const base =
-              'flex h-6 w-full cursor-pointer items-center border-l-2 pr-2 text-left text-[13px] leading-none'
+              'flex h-9 md:h-6 w-full cursor-pointer items-center border-l-2 pr-2 text-left text-[13px] leading-none'
             // bright cursor when the sidebar pane has focus; dimmed when focus is in the terminal
             const sel = selected
               ? paneFocused
@@ -98,7 +98,7 @@ export default function Sidebar({
       </div>
       <div className="flex items-center justify-between border-t border-border px-2 py-1 text-[11px] text-dimmer">
         <span>{servers.length} server{servers.length === 1 ? '' : 's'}</span>
-        <button onClick={onRefresh} className="hover:text-text" title="refresh (r)">
+        <button onClick={onRefresh} className="-my-1 px-1 py-1 hover:text-text" title="refresh (r)">
           ⟳ refresh
         </button>
       </div>

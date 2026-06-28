@@ -41,8 +41,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex h-screen w-screen items-center justify-center bg-bg text-text">
-      <div className="w-[360px] border border-border">
+    <main className="flex h-dvh w-screen items-center justify-center bg-bg p-4 text-text">
+      <div className="w-full max-w-[360px] border border-border">
         {/* hairline title */}
         <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-[12px]">
           <span className="flex items-center gap-1.5">
