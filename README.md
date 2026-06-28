@@ -286,6 +286,10 @@ hearth/
 Root scripts: `bun run dev` (both), `bun run build`, `bun run typecheck`, `bun run dev:web`,
 `bun run dev:hub`.
 
+## 友链
+
+- [linux.do](https://linux.do)
+
 ## License
 
 MIT
