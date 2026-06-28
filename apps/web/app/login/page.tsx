@@ -81,8 +81,18 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="border-t border-border px-3 py-1 text-[11px] text-dimmer">
-          tmux dashboard · self-hosted
+        <div className="flex items-center border-t border-border px-3 py-1 text-[11px] text-dimmer">
+          <span>tmux dashboard · self-hosted</span>
+          <span className="flex-1" />
+          <a
+            href="https://linux.do"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-dim hover:text-accent"
+            title="友链 · linux.do"
+          >
+            linux.do
+          </a>
         </div>
       </div>
     </main>
