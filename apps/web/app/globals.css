@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/* Hearth design tokens — Tailwind v4 @theme auto-generates bg / text / border utilities */
+@theme {
+  --color-bg: #0d0e0f;
+  --color-text: #c4c8c5;
+  --color-dim: #8a8f8c;
+  --color-dimmer: #5b605d;
+  --color-border: #2a2d2b;
+  --color-accent: #6cb6a4;
+  --color-sel-bg: #173430;
+  --color-sel-text: #d9efe9;
+  --color-live: #84b86f;
+  --color-danger: #cf7d75;
+  --color-data: #c9a86a;
+
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* Self-hosted MesloLGS NF (Nerd Font) — powers terminal powerline/devicon glyphs, no local install needed */
+@font-face {
+  font-family: "MesloLGS NF";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/MesloLGS-NF-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "MesloLGS NF";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/MesloLGS-NF-Bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "MesloLGS NF";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/MesloLGS-NF-Italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "MesloLGS NF";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/MesloLGS-NF-BoldItalic.woff2") format("woff2");
+}
+
+/* Iron rule: zero border-radius everywhere. */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+body {
+  font-size: 13px;
+  line-height: 1.25;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* TUI scrollbars — thin, no chrome */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* No focus rings — selection is expressed by the row bar, not an outline. */
+:focus {
+  outline: none;
+}
+
+/* xterm fills its pane */
+.xterm,
+.xterm-viewport,
+.xterm-screen {
+  height: 100%;
+}
+.xterm .xterm-viewport {
+  background-color: transparent !important;
+}
