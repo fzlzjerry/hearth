@@ -82,6 +82,19 @@ export async function fetchWsToken(): Promise<{ token: string; wsUrl: string }> 
   return jsonOrThrow<{ token: string; wsUrl: string }>(res)
 }
 
+/** Upload a pasted image to the target host; returns the absolute path written there. */
+export async function uploadImage(
+  serverId: string,
+  payload: { filename: string; mime: string; dataBase64: string },
+): Promise<{ path: string }> {
+  const res = await fetch(`/api/servers/${encodeURIComponent(serverId)}/upload`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return jsonOrThrow<{ path: string }>(res)
+}
+
 export async function logout(): Promise<void> {
   await fetch('/api/logout', { method: 'POST' })
 }

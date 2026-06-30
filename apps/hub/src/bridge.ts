@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import type { WebSocket } from 'ws'
 import type { ClientChannel } from 'ssh2'
 import type { ServerConfig } from './servers'
@@ -41,7 +42,8 @@ async function bridgeRemote(socket: WebSocket, opts: AttachOpts): Promise<void> 
   if (socket.readyState !== socket.OPEN) return
 
   conn.exec(
-    attachCommand(session),
+    // No explicit cwd → tmux is created from the SSH login directory (the remote user's home).
+    attachCommand(session, server.cwd),
     { pty: { term: 'xterm-256color', rows, cols } },
     (err, stream: ClientChannel) => {
       if (err) {
@@ -72,7 +74,7 @@ async function bridgeRemote(socket: WebSocket, opts: AttachOpts): Promise<void> 
 }
 
 async function bridgeLocal(socket: WebSocket, opts: AttachOpts): Promise<void> {
-  const { session, cols, rows } = opts
+  const { server, session, cols, rows } = opts
   let nodePty: typeof import('node-pty')
   try {
     nodePty = await import('node-pty')
@@ -82,11 +84,15 @@ async function bridgeLocal(socket: WebSocket, opts: AttachOpts): Promise<void> {
     return
   }
 
-  const p = nodePty.spawn('tmux', attachArgv(session), {
+  // os.homedir() reads the user database (getpwuid), so it resolves even when a process manager
+  // (systemd/pm2/docker) launches hearthd with $HOME unset — which would otherwise drop tmux into the
+  // service's WorkingDirectory instead of ~. `-c` makes the start directory explicit for good measure.
+  const startDir = server.cwd ?? homedir()
+  const p = nodePty.spawn('tmux', attachArgv(session, startDir), {
     name: 'xterm-256color',
     cols,
     rows,
-    cwd: process.env.HOME,
+    cwd: startDir,
     env: process.env as Record<string, string>,
   })
 

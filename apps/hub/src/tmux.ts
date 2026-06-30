@@ -19,17 +19,39 @@ export function shq(s: string): string {
 
 export const LIST_FORMAT = '#{session_name}|#{session_windows}|#{session_attached}'
 
+// `-c <dir>` pins a NEW session's start directory; tmux ignores it when -A attaches an existing one.
+// argv form: the caller passes an already-resolved absolute path (no shell, so no ~ / $HOME expansion).
+const startDirArgv = (cwd?: string): string[] => (cwd ? ['-c', cwd] : [])
+// shell form: only emitted when explicitly configured. With no `-c`, a remote `ssh exec` of tmux runs
+// from the SSH login directory (the user's home), so the default already lands in ~ — we avoid passing
+// a literal "$HOME" that a non-expanding exec shell could turn into a bogus directory name.
+const startDirShell = (cwd?: string): string => (cwd ? ` -c ${shq(cwd)}` : '')
+
 // ---- argv forms (local node-pty / child_process — no shell) ----
-export const attachArgv = (name: string): string[] => ['new-session', '-A', '-s', name]
+export const attachArgv = (name: string, cwd?: string): string[] => [
+  'new-session',
+  '-A',
+  '-s',
+  name,
+  ...startDirArgv(cwd),
+]
 export const listArgv = (): string[] => ['list-sessions', '-F', LIST_FORMAT]
-export const newDetachedArgv = (name: string): string[] => ['new-session', '-d', '-s', name]
+export const newDetachedArgv = (name: string, cwd?: string): string[] => [
+  'new-session',
+  '-d',
+  '-s',
+  name,
+  ...startDirArgv(cwd),
+]
 export const killArgv = (name: string): string[] => ['kill-session', '-t', name]
 export const captureArgv = (name: string): string[] => ['capture-pane', '-p', '-t', name]
 
 // ---- shell-command forms (remote ssh exec) — name MUST be pre-validated ----
-export const attachCommand = (name: string): string => `tmux new-session -A -s ${shq(name)}`
+export const attachCommand = (name: string, cwd?: string): string =>
+  `tmux new-session -A -s ${shq(name)}${startDirShell(cwd)}`
 export const listCommand = (): string => `tmux list-sessions -F ${shq(LIST_FORMAT)}`
-export const newDetachedCommand = (name: string): string => `tmux new-session -d -s ${shq(name)}`
+export const newDetachedCommand = (name: string, cwd?: string): string =>
+  `tmux new-session -d -s ${shq(name)}${startDirShell(cwd)}`
 export const killCommand = (name: string): string => `tmux kill-session -t ${shq(name)}`
 export const captureCommand = (name: string): string => `tmux capture-pane -p -t ${shq(name)}`
 

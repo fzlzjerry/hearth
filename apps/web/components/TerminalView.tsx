@@ -4,7 +4,8 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import type { Terminal as XTerm } from '@xterm/xterm'
 import type { FitAddon as XFitAddon } from '@xterm/addon-fit'
-import { AuthError, fetchWsToken } from '@/lib/api'
+import { AuthError, fetchWsToken, uploadImage } from '@/lib/api'
+import { copyToClipboard, decodeBase64Utf8 } from '@/lib/clipboard'
 import type { ConnStatus, TermInputApi } from '@/lib/types'
 
 // Exact palette from the spec — xterm needs concrete hex (it can't read CSS vars).
@@ -39,6 +40,20 @@ const TERMINAL_FONT =
   process.env.NEXT_PUBLIC_TERMINAL_FONT ||
   '"MesloLGS NF", "JetBrainsMono Nerd Font", "Hack Nerd Font", "Symbols Nerd Font", ' +
     '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace'
+
+/** Read a File as a bare base64 string (strips the `data:<mime>;base64,` prefix). */
+function readFileBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'))
+    reader.onload = () => {
+      const result = String(reader.result)
+      const comma = result.indexOf(',')
+      resolve(comma === -1 ? '' : result.slice(comma + 1))
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 interface Props {
   serverId: string
@@ -82,6 +97,9 @@ export default function TerminalView({
   const registerInputRef = useRef(registerInput)
   const tabIdRef = useRef(tabId)
   const [status, setStatus] = useState<ConnStatus>('connecting')
+  // Transient indicator for a pasted-image upload (null = nothing in flight).
+  const [imagePaste, setImagePaste] = useState<'uploading' | 'error' | null>(null)
+  const imagePasteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     ctrlArmedRef.current = !!ctrlArmed
@@ -123,6 +141,41 @@ export default function TerminalView({
     const ws = wsRef.current
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'resize', cols, rows }))
+    }
+  }
+
+  // Write raw text into the PTY (used to "type" a pasted image's path into the prompt).
+  function sendText(text: string) {
+    const ws = wsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(encRef.current.encode(text))
+  }
+
+  function flashImagePaste(state: 'uploading' | 'error' | null) {
+    if (imagePasteTimerRef.current) {
+      clearTimeout(imagePasteTimerRef.current)
+      imagePasteTimerRef.current = null
+    }
+    setImagePaste(state)
+    if (state === 'error') imagePasteTimerRef.current = setTimeout(() => setImagePaste(null), 4000)
+  }
+
+  // Upload a pasted image to the host and type its absolute path into the terminal, so CLIs like
+  // Claude Code (which can't reach the local clipboard over SSH) can read it by path.
+  async function handleImagePaste(file: File) {
+    flashImagePaste('uploading')
+    try {
+      const dataBase64 = await readFileBase64(file)
+      const { path } = await uploadImage(serverId, {
+        filename: file.name || 'pasted-image.png',
+        mime: file.type || 'image/png',
+        dataBase64,
+      })
+      sendText(`${path} `)
+      flashImagePaste(null)
+      termRef.current?.focus()
+    } catch (err) {
+      if (err instanceof AuthError) onAuthError?.()
+      flashImagePaste('error')
     }
   }
 
@@ -240,7 +293,58 @@ export default function TerminalView({
         }
       }
       textarea?.addEventListener('blur', onBlur)
-      blurCleanupRef.current = () => textarea?.removeEventListener('blur', onBlur)
+
+      // Paste an image -> upload to the host -> type its path into the prompt. preventDefault stops
+      // xterm from pasting the (useless) text representation of the image clipboard item.
+      const onPaste = (e: ClipboardEvent) => {
+        const items = e.clipboardData?.items
+        if (!items) return
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i]
+          if (it.kind === 'file' && it.type.startsWith('image/')) {
+            const file = it.getAsFile()
+            if (!file) continue
+            e.preventDefault()
+            void handleImagePaste(file)
+            return
+          }
+        }
+      }
+      textarea?.addEventListener('paste', onPaste)
+
+      // Copy-on-select: mirror the terminal selection to the local clipboard (debounced so a drag
+      // doesn't hammer the clipboard API). This is what makes selecting text land on the user's machine.
+      let selTimer: ReturnType<typeof setTimeout> | null = null
+      const selDisp = term.onSelectionChange(() => {
+        if (selTimer) clearTimeout(selTimer)
+        selTimer = setTimeout(() => {
+          const sel = termRef.current?.getSelection()
+          if (sel && sel.trim()) void copyToClipboard(sel)
+        }, 40)
+      })
+
+      // OSC 52: let apps inside tmux (vim, copy-mode, …) set the local clipboard. Needs tmux
+      // `set-clipboard on` + passthrough to actually forward the sequence out (see README).
+      const oscDisp = term.parser.registerOscHandler(52, (data) => {
+        const semi = data.indexOf(';')
+        if (semi === -1) return false
+        const payload = data.slice(semi + 1)
+        if (payload === '' || payload === '?') return true // clear / read-request: nothing to copy
+        try {
+          void copyToClipboard(decodeBase64Utf8(payload))
+        } catch {
+          /* malformed base64 — ignore */
+        }
+        return true
+      })
+
+      blurCleanupRef.current = () => {
+        textarea?.removeEventListener('blur', onBlur)
+        textarea?.removeEventListener('paste', onPaste)
+        selDisp.dispose()
+        oscDisp.dispose()
+        if (selTimer) clearTimeout(selTimer)
+      }
 
       // publish an imperative handle so the touch key bar can inject keys this terminal can't get otherwise
       const id = tabIdRef.current
@@ -264,6 +368,7 @@ export default function TerminalView({
     return () => {
       disposedRef.current = true
       if (reconnectRef.current) clearTimeout(reconnectRef.current)
+      if (imagePasteTimerRef.current) clearTimeout(imagePasteTimerRef.current)
       ro?.disconnect()
       blurCleanupRef.current?.()
       blurCleanupRef.current = null
@@ -302,6 +407,15 @@ export default function TerminalView({
         <div className="pointer-events-none absolute right-2 top-2 border border-border bg-bg px-2 py-0.5 text-[11px]">
           <span className={status === 'connecting' ? 'text-data' : 'text-danger'}>●</span>{' '}
           <span className="text-dim">{status === 'connecting' ? 'connecting…' : 'reconnecting…'}</span>
+        </div>
+      ) : null}
+      {imagePaste ? (
+        <div className="pointer-events-none absolute bottom-2 right-2 border border-border bg-bg px-2 py-0.5 text-[11px]">
+          {imagePaste === 'uploading' ? (
+            <span className="text-dim">uploading image…</span>
+          ) : (
+            <span className="text-danger">image upload failed</span>
+          )}
         </div>
       ) : null}
     </div>
