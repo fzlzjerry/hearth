@@ -13,6 +13,10 @@ const ServerSchema = z
     identityFile: z.string().optional(),
     password: z.string().optional(),
     local: z.boolean().default(false),
+    // Optional start directory for new tmux sessions. Must be absolute: it is passed to `tmux -c`
+    // either as an argv element (local, no shell) or single-quoted (remote), so ~ / $HOME would NOT
+    // expand. Omit to use the default (local: the service user's home; remote: the SSH login dir).
+    cwd: z.string().regex(/^\//, 'cwd must be an absolute path').optional(),
   })
   .refine((s) => s.local || (!!s.host && !!s.user), {
     message: 'remote server requires host and user',

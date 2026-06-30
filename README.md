@@ -178,6 +178,11 @@ bun run dev:web   # → http://localhost:3000
 | `identityFile` | no | Path to a private key on the hub (`~` is expanded). |
 | `password` | no | SSH password (use a key instead when possible). |
 | `local` | no | `true` runs tmux on the hub itself via node-pty (no SSH). |
+| `cwd` | no | Absolute start directory for **new** tmux sessions. Omit to use the default (local: the hub user's home; remote: the SSH login dir). |
+
+New sessions start in `~` by default. To pin a server elsewhere, set an absolute `cwd` (e.g.
+`"/srv/projects"`). `cwd` only applies when a session is **created** — reattaching to an existing
+session keeps its original directory, so kill and recreate it to pick up a change.
 
 You can also add and remove servers from the UI (`a` / `x`); changes are written back to this file.
 
@@ -240,6 +245,24 @@ WebSockets are proxied automatically. (Cloudflare drops idle connections after ~
 `⌘` is `Ctrl` on non-Mac. While a terminal is focused, plain keystrokes go to the terminal; only
 the `⌘`-combos are intercepted, so vim/tmux/etc. keep working.
 
+## Clipboard & images
+
+- **Select to copy.** Selecting text in a terminal copies it straight to your local clipboard. (The
+  browser Clipboard API needs a secure context, which the `https://` production deploy provides.)
+- **OSC 52.** Apps that set the clipboard via OSC 52 (vim with `clipboard=unnamedplus`, tmux
+  copy-mode, …) reach your local clipboard too. Inside tmux this only works if tmux forwards the
+  sequence — add to `~/.tmux.conf` on the target host:
+
+  ```tmux
+  set -g set-clipboard on
+  set -g allow-passthrough on
+  ```
+
+- **Paste an image.** Paste an image from your clipboard into a terminal and Hearth uploads it to the
+  target host under `~/.hearth/uploads/`, then types the absolute path into the prompt — so CLIs like
+  Claude Code (which can't read your local clipboard over SSH) can load it by path. Uploads are
+  capped at 10 MB and pruned after 7 days.
+
 ## API reference
 
 REST endpoints require `Authorization: Bearer <HEARTH_TOKEN>` (the web app adds this for you):
@@ -254,6 +277,7 @@ REST endpoints require `Authorization: Bearer <HEARTH_TOKEN>` (the web app adds 
 | `POST` | `/servers/:id/sessions` | Create a session (body: `{ "name": "..." }`). |
 | `DELETE` | `/servers/:id/sessions/:name` | Kill a session. |
 | `GET` | `/servers/:id/sessions/:name/preview` | `tmux capture-pane` snapshot. |
+| `POST` | `/servers/:id/upload` | Store a pasted image on the host (body: `{ "filename", "mime", "dataBase64" }`); returns `{ "path" }`. |
 
 Terminal WebSocket (token in the query string, short-lived):
 

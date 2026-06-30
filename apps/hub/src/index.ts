@@ -15,7 +15,10 @@ import { dropConnection } from './ssh'
 import { checkRestToken, verifyWsToken } from './auth'
 import { listSessions, createSession, killSession, previewSession, BadName } from './sessions'
 import { isValidSessionName } from './tmux'
+import { writeUpload } from './uploads'
 import { bridge } from './bridge'
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // decoded image cap
 
 function path(url: string): string {
   const i = url.indexOf('?')
@@ -153,6 +156,28 @@ async function main(): Promise<void> {
       }
     },
   )
+
+  // Pasted-image upload: land the image on the target host, return its absolute path. bodyLimit is
+  // raised here (default is 1 MiB) to fit a base64-encoded image up to MAX_IMAGE_BYTES (~33% larger).
+  app.post<{
+    Params: { id: string }
+    Body: { filename?: string; mime?: string; dataBase64?: string }
+  }>('/servers/:id/upload', { bodyLimit: 16 * 1024 * 1024 }, async (req, reply) => {
+    const server = getServer(req.params.id)
+    if (!server) return reply.code(404).send({ error: 'no such server' })
+    const { filename = '', mime = '', dataBase64 = '' } = req.body ?? {}
+    if (!mime.startsWith('image/')) return reply.code(400).send({ error: 'not an image' })
+    const data = Buffer.from(dataBase64, 'base64')
+    if (data.length === 0) return reply.code(400).send({ error: 'empty image' })
+    if (data.length > MAX_IMAGE_BYTES) return reply.code(413).send({ error: 'image too large' })
+    try {
+      const { path } = await writeUpload(server, { filename, mime, data })
+      return reply.code(201).send({ path })
+    } catch (err) {
+      req.log.warn({ err: String(err) }, 'image upload failed')
+      return reply.code(502).send({ error: 'failed to write image' })
+    }
+  })
 
   // --- WS terminal bridge ---
   app.get('/attach', { websocket: true }, (socket, req) => {

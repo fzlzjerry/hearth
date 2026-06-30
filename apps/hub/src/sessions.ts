@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import type { ServerConfig } from './servers'
 import { runLocalTmux, runRemote } from './exec'
 import * as tmux from './tmux'
@@ -23,8 +24,9 @@ export async function listSessions(server: ServerConfig): Promise<tmux.SessionIn
 
 export async function createSession(server: ServerConfig, name: string): Promise<void> {
   assertName(name)
-  if (server.local) await runLocalTmux(tmux.newDetachedArgv(name))
-  else await runRemote(server, tmux.newDetachedCommand(name))
+  // Pin new sessions to ~ (or the server's configured cwd), matching the attach path in bridge.ts.
+  if (server.local) await runLocalTmux(tmux.newDetachedArgv(name, server.cwd ?? homedir()))
+  else await runRemote(server, tmux.newDetachedCommand(name, server.cwd))
 }
 
 export async function killSession(server: ServerConfig, name: string): Promise<void> {
